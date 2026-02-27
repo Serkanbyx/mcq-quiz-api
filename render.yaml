@@ -3,14 +3,10 @@ services:
     name: mcq-quiz-api
     runtime: node
     plan: free
-    buildCommand: npm install && npm run seed
-    startCommand: npm start
+    buildCommand: npm install
+    startCommand: npm run seed && npm start
     envVars:
       - key: NODE_ENV
         value: production
       - key: DB_PATH
         value: ./data/quiz.db
-    disk:
-      name: quiz-data
-      mountPath: /opt/render/project/src/data
-      sizeGB: 1
