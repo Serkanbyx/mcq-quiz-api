@@ -27,6 +27,12 @@ const router = Router();
  *           type: string
  *           enum: [easy, medium, hard]
  *           example: "medium"
+ *         timeLimit:
+ *           type: integer
+ *           minimum: 30
+ *           maximum: 3600
+ *           description: "Time limit in seconds (optional, 30-3600)"
+ *           example: 300
  *     SubmitAnswerBody:
  *       type: object
  *       required:
@@ -35,6 +41,10 @@ const router = Router();
  *         optionId:
  *           type: integer
  *           example: 3
+ *         timeSpent:
+ *           type: integer
+ *           description: "Time spent on this question in seconds (optional)"
+ *           example: 15
  *     QuizStatus:
  *       type: object
  *       properties:
@@ -92,7 +102,7 @@ const shuffleArray = (array) => {
  */
 router.post("/", validateStartQuiz, (req, res, next) => {
   const db = getConnection();
-  const { totalQuestions = 10, category, difficulty } = req.body;
+  const { totalQuestions = 10, category, difficulty, timeLimit } = req.body;
 
   const conditions = [];
   const params = [];
@@ -117,11 +127,12 @@ router.post("/", validateStartQuiz, (req, res, next) => {
   const selectedQuestions = shuffleArray(allQuestions).slice(0, count);
 
   const quizId = uuidv4();
+  const now = new Date().toISOString();
 
   db.transaction(() => {
     db.prepare(
-      "INSERT INTO quizzes (id, total_questions, category, difficulty) VALUES (?, ?, ?, ?)"
-    ).run(quizId, count, category || null, difficulty || null);
+      "INSERT INTO quizzes (id, total_questions, category, difficulty, time_limit, started_at) VALUES (?, ?, ?, ?, ?, ?)"
+    ).run(quizId, count, category || null, difficulty || null, timeLimit || null, now);
 
     const insertQuizQuestion = db.prepare(
       "INSERT INTO quiz_questions (quiz_id, question_id, question_order) VALUES (?, ?, ?)"
@@ -134,16 +145,20 @@ router.post("/", validateStartQuiz, (req, res, next) => {
 
   const firstQuestion = getQuestionByOrder(db, quizId, 0);
 
-  res.status(201).json({
-    success: true,
-    data: {
-      quizId,
-      totalQuestions: count,
-      currentQuestion: 1,
-      status: "active",
-      question: firstQuestion,
-    },
-  });
+  const responseData = {
+    quizId,
+    totalQuestions: count,
+    currentQuestion: 1,
+    status: "active",
+    question: firstQuestion,
+  };
+
+  if (timeLimit) {
+    responseData.timeLimit = Number(timeLimit);
+    responseData.timeRemaining = Number(timeLimit);
+  }
+
+  res.status(201).json({ success: true, data: responseData });
 });
 
 /**
@@ -172,6 +187,17 @@ router.get("/:quizId", (req, res, next) => {
     return next(new AppError("Quiz not found", 404));
   }
 
+  if (quiz.status === "active" && quiz.time_limit && quiz.started_at) {
+    const elapsed = Math.floor((Date.now() - new Date(quiz.started_at).getTime()) / 1000);
+    if (elapsed >= quiz.time_limit) {
+      db.prepare(
+        "UPDATE quizzes SET status = 'completed', completed_at = datetime('now') WHERE id = ?"
+      ).run(quiz.id);
+      quiz.status = "completed";
+      quiz.completed_at = new Date().toISOString();
+    }
+  }
+
   const response = {
     id: quiz.id,
     totalQuestions: quiz.total_questions,
@@ -182,6 +208,14 @@ router.get("/:quizId", (req, res, next) => {
     difficulty: quiz.difficulty,
     createdAt: quiz.created_at,
   };
+
+  if (quiz.time_limit) {
+    response.timeLimit = quiz.time_limit;
+    if (quiz.started_at && quiz.status === "active") {
+      const elapsed = Math.floor((Date.now() - new Date(quiz.started_at).getTime()) / 1000);
+      response.timeRemaining = Math.max(0, quiz.time_limit - elapsed);
+    }
+  }
 
   if (quiz.status === "active") {
     response.question = getQuestionByOrder(db, quiz.id, quiz.current_index);
@@ -219,7 +253,7 @@ router.get("/:quizId", (req, res, next) => {
 router.post("/:quizId/answer", validateSubmitAnswer, (req, res, next) => {
   const db = getConnection();
   const { quizId } = req.params;
-  const { optionId } = req.body;
+  const { optionId, timeSpent } = req.body;
 
   const quiz = db.prepare("SELECT * FROM quizzes WHERE id = ?").get(quizId);
   if (!quiz) {
@@ -228,6 +262,16 @@ router.post("/:quizId/answer", validateSubmitAnswer, (req, res, next) => {
 
   if (quiz.status === "completed") {
     return next(new AppError("Quiz is already completed", 400));
+  }
+
+  if (quiz.time_limit && quiz.started_at) {
+    const elapsed = Math.floor((Date.now() - new Date(quiz.started_at).getTime()) / 1000);
+    if (elapsed >= quiz.time_limit) {
+      db.prepare(
+        "UPDATE quizzes SET status = 'completed', completed_at = datetime('now') WHERE id = ?"
+      ).run(quizId);
+      return next(new AppError("Time is up! Quiz has been automatically completed.", 400));
+    }
   }
 
   const currentQQ = db
@@ -257,8 +301,8 @@ router.post("/:quizId/answer", validateSubmitAnswer, (req, res, next) => {
 
   db.transaction(() => {
     db.prepare(
-      "UPDATE quiz_questions SET selected_option_id = ?, is_correct = ?, answered_at = datetime('now') WHERE id = ?"
-    ).run(Number(optionId), isCorrect ? 1 : 0, currentQQ.id);
+      "UPDATE quiz_questions SET selected_option_id = ?, is_correct = ?, time_spent = ?, answered_at = datetime('now') WHERE id = ?"
+    ).run(Number(optionId), isCorrect ? 1 : 0, timeSpent != null ? Number(timeSpent) : null, currentQQ.id);
 
     const newScore = quiz.score + (isCorrect ? 1 : 0);
     const newIndex = quiz.current_index + 1;
@@ -290,6 +334,11 @@ router.post("/:quizId/answer", validateSubmitAnswer, (req, res, next) => {
     totalQuestions: updatedQuiz.total_questions,
     status: updatedQuiz.status,
   };
+
+  if (updatedQuiz.time_limit && updatedQuiz.started_at && updatedQuiz.status === "active") {
+    const elapsed = Math.floor((Date.now() - new Date(updatedQuiz.started_at).getTime()) / 1000);
+    response.timeRemaining = Math.max(0, updatedQuiz.time_limit - elapsed);
+  }
 
   if (updatedQuiz.status === "active") {
     response.nextQuestion = getQuestionByOrder(db, quizId, updatedQuiz.current_index);
@@ -332,7 +381,7 @@ router.get("/:quizId/score", (req, res, next) => {
 
   const answers = db
     .prepare(
-      `SELECT qq.question_order, qq.is_correct, qq.selected_option_id,
+      `SELECT qq.question_order, qq.is_correct, qq.selected_option_id, qq.time_spent,
               q.question_text,
               so.option_text as selected_option_text,
               co.id as correct_option_id, co.option_text as correct_option_text
@@ -346,28 +395,34 @@ router.get("/:quizId/score", (req, res, next) => {
     .all(req.params.quizId);
 
   const percentage = Math.round((quiz.score / quiz.total_questions) * 100);
+  const totalTimeSpent = answers.reduce((sum, a) => sum + (a.time_spent || 0), 0);
 
-  res.json({
-    success: true,
-    data: {
-      quizId: quiz.id,
-      score: quiz.score,
-      totalQuestions: quiz.total_questions,
-      percentage,
-      status: quiz.status,
-      category: quiz.category,
-      difficulty: quiz.difficulty,
-      createdAt: quiz.created_at,
-      completedAt: quiz.completed_at,
-      results: answers.map((a) => ({
-        questionNumber: a.question_order + 1,
-        questionText: a.question_text,
-        isCorrect: Boolean(a.is_correct),
-        selectedAnswer: a.selected_option_text,
-        correctAnswer: a.correct_option_text,
-      })),
-    },
-  });
+  const responseData = {
+    quizId: quiz.id,
+    score: quiz.score,
+    totalQuestions: quiz.total_questions,
+    percentage,
+    status: quiz.status,
+    category: quiz.category,
+    difficulty: quiz.difficulty,
+    createdAt: quiz.created_at,
+    completedAt: quiz.completed_at,
+    results: answers.map((a) => ({
+      questionNumber: a.question_order + 1,
+      questionText: a.question_text,
+      isCorrect: Boolean(a.is_correct),
+      selectedAnswer: a.selected_option_text,
+      correctAnswer: a.correct_option_text,
+      timeSpent: a.time_spent,
+    })),
+  };
+
+  if (quiz.time_limit) {
+    responseData.timeLimit = quiz.time_limit;
+  }
+  responseData.totalTimeSpent = totalTimeSpent;
+
+  res.json({ success: true, data: responseData });
 });
 
 /**

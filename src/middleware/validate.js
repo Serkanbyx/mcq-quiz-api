@@ -4,12 +4,19 @@ const VALID_CATEGORIES = ["general", "web", "javascript", "computer-science", "d
 const VALID_DIFFICULTIES = ["easy", "medium", "hard"];
 
 const validateStartQuiz = (req, _res, next) => {
-  const { totalQuestions, category, difficulty } = req.body;
+  const { totalQuestions, category, difficulty, timeLimit } = req.body;
 
   if (totalQuestions !== undefined) {
     const num = Number(totalQuestions);
     if (!Number.isInteger(num) || num < 1 || num > 50) {
       return next(new AppError("totalQuestions must be an integer between 1 and 50", 400));
+    }
+  }
+
+  if (timeLimit !== undefined) {
+    const num = Number(timeLimit);
+    if (!Number.isInteger(num) || num < 30 || num > 3600) {
+      return next(new AppError("timeLimit must be an integer between 30 and 3600 seconds", 400));
     }
   }
 
@@ -29,7 +36,7 @@ const validateStartQuiz = (req, _res, next) => {
 };
 
 const validateSubmitAnswer = (req, _res, next) => {
-  const { optionId } = req.body;
+  const { optionId, timeSpent } = req.body;
 
   if (optionId === undefined || optionId === null) {
     return next(new AppError("optionId is required", 400));
@@ -37,6 +44,13 @@ const validateSubmitAnswer = (req, _res, next) => {
 
   if (!Number.isInteger(Number(optionId))) {
     return next(new AppError("optionId must be a valid integer", 400));
+  }
+
+  if (timeSpent !== undefined) {
+    const num = Number(timeSpent);
+    if (!Number.isInteger(num) || num < 0) {
+      return next(new AppError("timeSpent must be a non-negative integer (seconds)", 400));
+    }
   }
 
   next();
@@ -79,10 +93,52 @@ const validateCreateQuestion = (req, _res, next) => {
   next();
 };
 
+const validateUpdateQuestion = (req, _res, next) => {
+  const { questionText, options, category, difficulty } = req.body;
+
+  if (questionText !== undefined) {
+    if (typeof questionText !== "string" || questionText.trim().length < 5) {
+      return next(new AppError("questionText must be at least 5 characters", 400));
+    }
+  }
+
+  if (options !== undefined) {
+    if (!Array.isArray(options) || options.length < 2 || options.length > 6) {
+      return next(new AppError("options must be an array with 2 to 6 items", 400));
+    }
+
+    const correctCount = options.filter((o) => o.isCorrect).length;
+    if (correctCount !== 1) {
+      return next(new AppError("Exactly one option must be marked as correct", 400));
+    }
+
+    for (const opt of options) {
+      if (!opt.optionText || typeof opt.optionText !== "string" || opt.optionText.trim().length < 1) {
+        return next(new AppError("Each option must have a valid optionText", 400));
+      }
+    }
+  }
+
+  if (category && !VALID_CATEGORIES.includes(category)) {
+    return next(
+      new AppError(`Invalid category. Valid options: ${VALID_CATEGORIES.join(", ")}`, 400)
+    );
+  }
+
+  if (difficulty && !VALID_DIFFICULTIES.includes(difficulty)) {
+    return next(
+      new AppError(`Invalid difficulty. Valid options: ${VALID_DIFFICULTIES.join(", ")}`, 400)
+    );
+  }
+
+  next();
+};
+
 module.exports = {
   validateStartQuiz,
   validateSubmitAnswer,
   validateCreateQuestion,
+  validateUpdateQuestion,
   VALID_CATEGORIES,
   VALID_DIFFICULTIES,
 };

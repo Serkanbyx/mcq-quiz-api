@@ -1,15 +1,41 @@
 const express = require("express");
 const cors = require("cors");
+const helmet = require("helmet");
+const rateLimit = require("express-rate-limit");
 const swaggerUi = require("swagger-ui-express");
 const swaggerSpec = require("./config/swagger");
 const questionRoutes = require("./routes/questionRoutes");
 const quizRoutes = require("./routes/quizRoutes");
+const statisticRoutes = require("./routes/statisticRoutes");
 const { errorHandler, notFoundHandler } = require("./middleware/errorHandler");
+const { sanitizeBody } = require("./middleware/sanitize");
 
 const app = express();
 
-app.use(cors());
-app.use(express.json());
+app.use(helmet({ contentSecurityPolicy: false }));
+
+app.use(
+  cors({
+    origin: process.env.CORS_ORIGIN || "*",
+    methods: ["GET", "POST", "PUT", "DELETE"],
+    allowedHeaders: ["Content-Type"],
+  })
+);
+
+app.use(express.json({ limit: "16kb" }));
+app.use(sanitizeBody);
+
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: Number(process.env.RATE_LIMIT_MAX) || 100,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    success: false,
+    error: "Too many requests, please try again later.",
+  },
+});
+app.use("/api", apiLimiter);
 
 app.get("/", (_req, res) => {
   const html = `<!DOCTYPE html>
@@ -287,7 +313,7 @@ app.get("/", (_req, res) => {
   <div class="container">
     <div class="quiz-icon"></div>
     <h1>MCQ Quiz API</h1>
-    <p class="version">v1.0.0</p>
+    <p class="version">v1.1.0</p>
 
     <div class="option-labels">
       <span class="option-label">A</span>
@@ -318,11 +344,13 @@ app.get("/api", (_req, res) => {
   res.json({
     success: true,
     message: "MCQ Quiz API",
-    version: "1.0.0",
+    version: "1.1.0",
     documentation: "/api-docs",
     endpoints: {
       questions: "/api/questions",
       quizzes: "/api/quizzes",
+      statistics: "/api/statistics",
+      leaderboard: "/api/leaderboard",
     },
   });
 });
@@ -338,6 +366,7 @@ app.get("/api/health", (_req, res) => {
 app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec, { explorer: true }));
 app.use("/api/questions", questionRoutes);
 app.use("/api/quizzes", quizRoutes);
+app.use("/api", statisticRoutes);
 
 app.use(notFoundHandler);
 app.use(errorHandler);

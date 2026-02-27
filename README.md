@@ -237,7 +237,7 @@ This project is licensed under the MIT License. See the [LICENSE](LICENSE) file 
 - [Swagger UI Express](https://github.com/scottie1984/swagger-ui-express) — API documentation
 - [Render](https://render.com/) — Cloud hosting platform
 
-## Developer
+## Contact
 
 **Serkanby**
 
@@ -245,8 +245,6 @@ This project is licensed under the MIT License. See the [LICENSE](LICENSE) file 
 - GitHub: [@Serkanbyx](https://github.com/Serkanbyx)
 - Email: [serkanbyx1@gmail.com](mailto:serkanbyx1@gmail.com)
 
-## Contact
+---
 
-- [Open an Issue](https://github.com/Serkanbyx/s3.9_MCQ-Quiz-API/issues)
-- Email: [serkanbyx1@gmail.com](mailto:serkanbyx1@gmail.com)
-- Website: [serkanbayraktar.com](https://serkanbayraktar.com/)
+⭐ If you like this project, don't forget to give it a star!
