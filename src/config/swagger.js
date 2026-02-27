@@ -8,7 +8,8 @@ const swaggerDefinition = {
     description:
       "A REST API for multiple-choice quiz games with random question selection and score calculation.",
     contact: {
-      name: "API Support",
+      name: "Serkanby",
+      url: "https://serkanbayraktar.com/",
     },
   },
   servers: [

@@ -17,7 +17,7 @@ A RESTful API for multiple-choice quiz games with random question selection, cat
 
 ## Live Demo
 
-[🎮 View Live API](https://mcq-quiz-api.onrender.com/api)
+[🎮 View Live API](https://mcq-quiz-api.onrender.com/)
 
 [📖 View Swagger Docs](https://mcq-quiz-api.onrender.com/api-docs)
 
@@ -228,15 +228,7 @@ When starting a quiz, specify the number of questions:
 
 ## License
 
-This project is licensed under the ISC License. See the [LICENSE](LICENSE) file for details.
-
-## Developer
-
-**Serkan Bayraktar**
-
-- 🌐 [serkanbayraktar.com](https://serkanbayraktar.com)
-- 🐙 [GitHub @Serkanbyx](https://github.com/Serkanbyx)
-- 📧 [serkanbyx1@gmail.com](mailto:serkanbyx1@gmail.com)
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
 
 ## Acknowledgments
 
@@ -245,12 +237,16 @@ This project is licensed under the ISC License. See the [LICENSE](LICENSE) file 
 - [Swagger UI Express](https://github.com/scottie1984/swagger-ui-express) — API documentation
 - [Render](https://render.com/) — Cloud hosting platform
 
+## Developer
+
+**Serkanby**
+
+- Website: [serkanbayraktar.com](https://serkanbayraktar.com/)
+- GitHub: [@Serkanbyx](https://github.com/Serkanbyx)
+- Email: [serkanbyx1@gmail.com](mailto:serkanbyx1@gmail.com)
+
 ## Contact
 
-- 🐛 [Report a Bug](https://github.com/Serkanbyx/s3.9_MCQ-Quiz-API/issues)
-- 📧 [serkanbyx1@gmail.com](mailto:serkanbyx1@gmail.com)
-- 🌐 [serkanbayraktar.com](https://serkanbayraktar.com)
-
----
-
-⭐ If you like this project, don't forget to give it a star!
+- [Open an Issue](https://github.com/Serkanbyx/s3.9_MCQ-Quiz-API/issues)
+- Email: [serkanbyx1@gmail.com](mailto:serkanbyx1@gmail.com)
+- Website: [serkanbayraktar.com](https://serkanbayraktar.com/)
